@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard Alert – Jakarta Timur</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header>
+    <div class="header-inner">
+      <div class="header-left">
+        <div class="logo-dot"></div>
+        <div>
+          <span class="header-title">DASHBOARD ALERT</span>
+          <span class="header-sub">Jakarta Timur · Real-Time Monitor</span>
+        </div>
+      </div>
+      <div class="header-right">
+        <span class="live-badge"><span class="pulse"></span>LIVE</span>
+        <span id="last-update">–</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- SUMMARY BAR -->
+  <section class="summary-bar">
+    <div class="summary-card">
+      <span class="summary-label">Total Alert</span>
+      <span class="summary-value" id="total-alert">0</span>
+    </div>
+    <div class="summary-card">
+      <span class="summary-label">Total STO Aktif</span>
+      <span class="summary-value" id="total-sto">0</span>
+    </div>
+    <div class="summary-card">
+      <span class="summary-label">Refresh Interval</span>
+      <span class="summary-value">5 mnt</span>
+    </div>
+  </section>
+
+  <!-- STATUS / ERROR MESSAGE -->
+  <div id="status-msg" class="status-msg hidden"></div>
+
+  <!-- MAIN GRID — STO CARDS -->
+  <main id="sto-grid" class="sto-grid">
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Memuat data dari spreadsheet…</p>
+    </div>
+  </main>
+
+  <!-- MODAL DETAIL -->
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <h2 id="modal-title">Detail Alert</h2>
+          <span id="modal-subtitle" class="modal-subtitle"></span>
+        </div>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-search-row">
+        <input type="text" id="modal-search" placeholder="Cari SN atau Customer Type…" oninput="filterModal()" />
+        <span id="modal-count" class="modal-count"></span>
+      </div>
+      <div class="modal-table-wrap">
+        <table class="modal-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Serial Number (SN)</th>
+              <th>Customer Type</th>
+            </tr>
+          </thead>
+          <tbody id="modal-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
