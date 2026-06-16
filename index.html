@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -19,11 +19,24 @@
         </div>
       </div>
       <div class="header-right">
+        <button class="theme-btn" onclick="toggleTheme()" title="Ganti tema">🌙</button>
         <span class="live-badge"><span class="pulse"></span>LIVE</span>
         <span id="last-update">–</span>
       </div>
     </div>
   </header>
+
+  <!-- TOOLBAR: FILTER STO + THEME -->
+  <div class="toolbar">
+    <div class="toolbar-inner">
+      <div class="toolbar-left">
+        <span class="toolbar-label">Filter STO:</span>
+        <div id="sto-filter-wrap" class="sto-filter-wrap">
+          <button class="sto-pill active" onclick="filterSTO('ALL')">Semua</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- SUMMARY BAR -->
   <section class="summary-bar">
@@ -35,9 +48,21 @@
       <span class="summary-label">Total STO Aktif</span>
       <span class="summary-value" id="total-sto">0</span>
     </div>
-    <div class="summary-card">
-      <span class="summary-label">Refresh Interval</span>
-      <span class="summary-value">5 mnt</span>
+    <div class="summary-card status-online">
+      <span class="summary-label">Online</span>
+      <span class="summary-value" id="total-online">0</span>
+    </div>
+    <div class="summary-card status-los">
+      <span class="summary-label">LOS</span>
+      <span class="summary-value" id="total-los">0</span>
+    </div>
+    <div class="summary-card status-dying">
+      <span class="summary-label">Dying Gasp</span>
+      <span class="summary-value" id="total-dying">0</span>
+    </div>
+    <div class="summary-card status-offline">
+      <span class="summary-label">Offline</span>
+      <span class="summary-value" id="total-offline">0</span>
     </div>
   </section>
 
@@ -63,7 +88,7 @@
         <button class="modal-close" onclick="closeModal()">✕</button>
       </div>
       <div class="modal-search-row">
-        <input type="text" id="modal-search" placeholder="Cari SN atau Customer Type…" oninput="filterModal()" />
+        <input type="text" id="modal-search" placeholder="Cari SN, Customer Type, atau Status…" oninput="filterModal()" />
         <span id="modal-count" class="modal-count"></span>
       </div>
       <div class="modal-table-wrap">
@@ -73,6 +98,7 @@
               <th>#</th>
               <th>Serial Number (SN)</th>
               <th>Customer Type</th>
+              <th>Status</th>
             </tr>
           </thead>
           <tbody id="modal-tbody"></tbody>
