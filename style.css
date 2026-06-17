@@ -332,14 +332,28 @@ header {
 .panel-icon { font-size: 13px; }
 
 .panel-content {
-  font-size: 13px; color: var(--text);
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px 14px;
-  line-height: 1.6;
+  display: flex; flex-wrap: wrap; gap: 8px;
   min-height: 48px;
-  word-break: break-word;
+}
+
+.panel-badge {
+  display: inline-block;
+  padding: 5px 12px; border-radius: 6px;
+  font-size: 12px; font-weight: 600;
+  letter-spacing: 0.3px;
+}
+.panel-badge-action {
+  background: rgba(249,115,22,0.12);
+  border: 1px solid rgba(249,115,22,0.35);
+  color: var(--accent2);
+}
+.panel-badge-kendala {
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.3);
+  color: var(--c-offline);
+}
+.panel-empty {
+  font-size: 12px; color: var(--text3); font-style: italic;
 }
 
 .panel-divider { height: 1px; background: var(--border); margin: 4px 0 16px; }

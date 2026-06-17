@@ -2,7 +2,7 @@
    DASHBOARD ALERT – JAKARTA TIMUR  v2
    Fitur: Status (Online/LOS/Dying Gasp/Offline)
           Filter STO, Dark/Light theme,
-          Panel ACTION STO & KENDALA
+          Panel ACTION STO & KENDALA (semua unik)
    ============================================= */
 
 const CONFIG = {
@@ -18,7 +18,6 @@ const CONFIG = {
 
   REFRESH_MS: 5 * 60 * 1000,
 
-  // Whitelist STO — hanya nama ini yang ditampilkan di pills & cards
   STO_WHITELIST: ['GAN','KRG','PGG','CWA','KLD','JTN','RMG','PDK','PGB','PSR'],
 };
 
@@ -42,10 +41,10 @@ function normalizeStatus(raw) {
 }
 
 /* ── State ──────────────────────────────────── */
-let allRows       = [];   // hanya baris STO whitelist
-let modalRows     = [];
-let activeSTO     = 'ALL';
-let activePanelSTO = null; // nama STO yang panel-nya sedang terbuka
+let allRows        = [];
+let modalRows      = [];
+let activeSTO      = 'ALL';
+let activePanelSTO = null;
 
 /* ── Theme ──────────────────────────────────── */
 function toggleTheme() {
@@ -73,13 +72,10 @@ function filterSTO(sto) {
     b.classList.toggle('active', b.dataset.sto === sto);
   });
 
-  const filtered = sto === 'ALL' ? allRows : allRows.filter(r => r.sto === sto);
+  const filtered    = sto === 'ALL' ? allRows : allRows.filter(r => r.sto === sto);
   const displayRows = filtered.length ? filtered : allRows;
-
-  // Update summary sesuai filter
-  const s = globalStatus(displayRows);
-  const grouped = aggregate(displayRows);
-  setMeta(displayRows.length, grouped.length, s);
+  const grouped     = aggregate(displayRows);
+  setMeta(displayRows.length, grouped.length, globalStatus(displayRows));
   renderCards(displayRows);
 }
 
@@ -88,7 +84,7 @@ function buildSTOPills(grouped) {
   wrap.innerHTML = `<button class="sto-pill ${activeSTO==='ALL'?'active':''}" data-sto="ALL" onclick="filterSTO('ALL')">Semua</button>`;
   grouped.forEach(s => {
     const btn = document.createElement('button');
-    btn.className = 'sto-pill' + (activeSTO === s.name ? ' active' : '');
+    btn.className  = 'sto-pill' + (activeSTO === s.name ? ' active' : '');
     btn.dataset.sto = s.name;
     btn.textContent = s.name;
     btn.onclick = () => filterSTO(s.name);
@@ -108,7 +104,7 @@ async function fetchData() {
 }
 
 function parseCSV(text) {
-  const lines = text.trim().split('\n');
+  const lines   = text.trim().split('\n');
   if (lines.length < 2) return [];
   const headers = csvSplit(lines[0]).map(h => h.replace(/"/g,'').trim());
 
@@ -127,21 +123,19 @@ function parseCSV(text) {
   const rows = [];
 
   for (let i = 1; i < lines.length; i++) {
-    const c = csvSplit(lines[i]).map(x => x.replace(/^"|"$/g,'').trim());
-    const sto = c[iSTO]||'';
-    const sn  = c[iSN]||'';
+    const c   = csvSplit(lines[i]).map(x => x.replace(/^"|"$/g,'').trim());
+    const sto = c[iSTO] || '';
+    const sn  = c[iSN]  || '';
     if (!sto && !sn) continue;
-
-    // Filter: hanya STO yang ada di whitelist
     if (!whitelist.has(sto.toUpperCase())) continue;
 
     rows.push({
       sto,
       sn,
-      ctype:   c[iCTYPE]   || 'Tidak diketahui',
+      ctype:   c[iCTYPE]  || 'Tidak diketahui',
       status:  normalizeStatus(iSTATUS  !== -1 ? c[iSTATUS]  : ''),
-      action:  iACTION  !== -1 ? (c[iACTION]  || '') : '',
-      kendala: iKENDALA !== -1 ? (c[iKENDALA] || '') : '',
+      action:  iACTION  !== -1 ? (c[iACTION]  || '').trim() : '',
+      kendala: iKENDALA !== -1 ? (c[iKENDALA] || '').trim() : '',
     });
   }
   return rows;
@@ -164,36 +158,41 @@ function aggregate(rows) {
   const map = {};
   for (const r of rows) {
     const k = r.sto || '(Tanpa STO)';
-    if (!map[k]) map[k] = { total:0, ctypes:{}, statuses:{online:0,los:0,dying:0,offline:0,unknown:0}, rows:[], action:'', kendala:'' };
+    if (!map[k]) map[k] = {
+      total: 0,
+      ctypes: {},
+      statuses: { online:0, los:0, dying:0, offline:0, unknown:0 },
+      rows: [],
+      actions: new Set(),   // semua unique ACTION STO
+      kendala: new Set(),   // semua unique KENDALA
+    };
     map[k].total++;
-    map[k].ctypes[r.ctype] = (map[k].ctypes[r.ctype]||0)+1;
+    map[k].ctypes[r.ctype] = (map[k].ctypes[r.ctype] || 0) + 1;
     map[k].statuses[r.status]++;
     map[k].rows.push(r);
-    // Ambil action & kendala dari baris pertama yang ada isinya
-    if (!map[k].action  && r.action)  map[k].action  = r.action;
-    if (!map[k].kendala && r.kendala) map[k].kendala = r.kendala;
+    if (r.action)  map[k].actions.add(r.action);
+    if (r.kendala) map[k].kendala.add(r.kendala);
   }
   return Object.entries(map)
-    .sort((a,b)=>b[1].total-a[1].total)
-    .map(([name,d])=>({name,...d}));
+    .sort((a,b) => b[1].total - a[1].total)
+    .map(([name, d]) => ({
+      name,
+      ...d,
+      actions: [...d.actions],
+      kendala: [...d.kendala],
+    }));
 }
 
 function globalStatus(rows) {
-  const s = {online:0,los:0,dying:0,offline:0};
-  for(const r of rows) if(s[r.status]!==undefined) s[r.status]++;
+  const s = { online:0, los:0, dying:0, offline:0 };
+  for (const r of rows) if (s[r.status] !== undefined) s[r.status]++;
   return s;
 }
 
 /* ── Render ─────────────────────────────────── */
 function render(rows) {
-  const grouped = aggregate(rows);
-  // Pills dibangun dari whitelist yang ada di data, urut sesuai whitelist
-  const whitelistGrouped = aggregate(allRows).filter(g =>
-    CONFIG.STO_WHITELIST.includes(g.name.toUpperCase()) ||
-    CONFIG.STO_WHITELIST.includes(g.name)
-  );
-  buildSTOPills(whitelistGrouped);
-  setMeta(rows.length, grouped.length, globalStatus(rows));
+  buildSTOPills(aggregate(allRows));
+  setMeta(rows.length, aggregate(rows).length, globalStatus(rows));
   renderCards(rows);
 }
 
@@ -206,7 +205,6 @@ function renderCards(rows) {
   const grouped = aggregate(rows);
   grid.innerHTML = grouped.map(renderSTOCard).join('');
 
-  // Jika ada panel yang aktif, highlight card-nya
   if (activePanelSTO) {
     const card = document.querySelector(`.sto-card[data-sto="${CSS.escape(activePanelSTO)}"]`);
     if (card) card.classList.add('card-active');
@@ -214,11 +212,11 @@ function renderCards(rows) {
 }
 
 function renderSTOCard(sto) {
-  const statOrder = ['online','los','dying','offline'];
+  const statOrder  = ['online','los','dying','offline'];
   const statusHTML = statOrder.map(sk => {
     const cnt = sto.statuses[sk] || 0;
     return `
-      <div class="status-item" onclick="openModal('${esc(sto.name)}',null,'${sk}')" title="Lihat ${STATUS_LABEL[sk]}">
+      <div class="status-item" onclick="openModal('${esc(sto.name)}',null,'${sk}');event.stopPropagation()" title="Lihat ${STATUS_LABEL[sk]}">
         <span class="status-dot-label">
           <span class="status-dot ${STATUS_DOT[sk]}"></span>
           ${STATUS_LABEL[sk]}
@@ -227,23 +225,26 @@ function renderSTOCard(sto) {
       </div>`;
   }).join('');
 
-  const ctypes = Object.entries(sto.ctypes).sort((a,b)=>b[1]-a[1]);
+  const ctypes    = Object.entries(sto.ctypes).sort((a,b) => b[1]-a[1]);
   const ctypeHTML = ctypes.map(([name,count]) => {
-    const pct = Math.round(count/sto.total*100);
+    const pct = Math.round(count / sto.total * 100);
     return `
       <div class="ctype-row">
         <span class="ctype-name" title="${esc(name)}">${esc(name)}</span>
         <div class="ctype-right">
           <div class="ctype-bar-bg"><div class="ctype-bar-fill" style="width:${pct}%"></div></div>
-          <span class="ctype-count" onclick="openModal('${esc(sto.name)}','${esc(name)}',null)">${count}</span>
+          <span class="ctype-count" onclick="openModal('${esc(sto.name)}','${esc(name)}',null);event.stopPropagation()">${count}</span>
         </div>
       </div>`;
   }).join('');
 
   const isActive = activePanelSTO === sto.name;
 
+  // Simpan data actions & kendala di dataset sebagai JSON
   return `
-    <div class="sto-card${isActive?' card-active':''}" data-sto="${esc(sto.name)}" onclick="toggleSidePanel('${esc(sto.name)}', '${esc(sto.action)}', '${esc(sto.kendala)}', event)">
+    <div class="sto-card${isActive?' card-active':''}"
+         data-sto="${esc(sto.name)}"
+         onclick="toggleSidePanel('${esc(sto.name)}', event)">
       <div class="sto-name">${esc(sto.name)}</div>
       <div class="sto-total-row">
         <span class="sto-total-label">Total Alert</span>
@@ -286,12 +287,10 @@ function esc(s) {
 }
 
 /* ── Side Panel ACTION & KENDALA ────────────── */
-function toggleSidePanel(stoName, action, kendala, event) {
-  // Jangan buka panel jika klik pada elemen interaktif di dalam card
+function toggleSidePanel(stoName, event) {
   if (event && event.target.closest('.status-item, .ctype-count, .sto-total-badge')) return;
 
   if (activePanelSTO === stoName) {
-    // Klik card yang sama → tutup panel
     closeSidePanel();
     return;
   }
@@ -303,35 +302,55 @@ function toggleSidePanel(stoName, action, kendala, event) {
   const card = document.querySelector(`.sto-card[data-sto="${CSS.escape(stoName)}"]`);
   if (card) card.classList.add('card-active');
 
-  // Isi & tampilkan panel
+  // Kumpulkan unique actions & kendala dari allRows untuk STO ini
+  const stoRows  = allRows.filter(r => r.sto === stoName);
+  const actions  = [...new Set(stoRows.map(r => r.action).filter(Boolean))];
+  const kendala  = [...new Set(stoRows.map(r => r.kendala).filter(Boolean))];
+
+  // Render panel header
   document.getElementById('panel-sto-name').textContent = stoName;
-  document.getElementById('panel-action').textContent   = action  || '–';
-  document.getElementById('panel-kendala').textContent  = kendala || '–';
+
+  // Render ACTION STO — tiap item sebagai badge
+  const actionEl = document.getElementById('panel-action');
+  if (actions.length) {
+    actionEl.innerHTML = actions.map(a =>
+      `<span class="panel-badge panel-badge-action">${esc(a)}</span>`
+    ).join('');
+  } else {
+    actionEl.innerHTML = '<span class="panel-empty">Tidak ada data</span>';
+  }
+
+  // Render KENDALA — tiap item sebagai badge
+  const kendalaEl = document.getElementById('panel-kendala');
+  if (kendala.length) {
+    kendalaEl.innerHTML = kendala.map(k =>
+      `<span class="panel-badge panel-badge-kendala">${esc(k)}</span>`
+    ).join('');
+  } else {
+    kendalaEl.innerHTML = '<span class="panel-empty">Tidak ada data</span>';
+  }
 
   const panel = document.getElementById('side-panel');
   panel.classList.remove('hidden');
-  panel.classList.add('panel-open');
 }
 
 function closeSidePanel() {
   activePanelSTO = null;
   document.querySelectorAll('.sto-card').forEach(c => c.classList.remove('card-active'));
-  const panel = document.getElementById('side-panel');
-  panel.classList.add('hidden');
-  panel.classList.remove('panel-open');
+  document.getElementById('side-panel').classList.add('hidden');
 }
 
 /* ── Modal ──────────────────────────────────── */
 function openModal(stoName, ctypeName, statusKey) {
-  let rows = allRows.filter(r => r.sto === stoName);
+  let rows     = allRows.filter(r => r.sto === stoName);
   let subtitle = stoName;
 
   if (ctypeName) {
-    rows = rows.filter(r => r.ctype === ctypeName);
+    rows      = rows.filter(r => r.ctype === ctypeName);
     subtitle += ' · ' + ctypeName;
   }
   if (statusKey) {
-    rows = rows.filter(r => r.status === statusKey);
+    rows      = rows.filter(r => r.status === statusKey);
     subtitle += ' · ' + STATUS_LABEL[statusKey];
   }
   if (!ctypeName && !statusKey) subtitle += ' · Semua Alert';
@@ -386,13 +405,11 @@ async function loadAndRender() {
     hideError();
     allRows = rows;
 
-    const displayed = activeSTO === 'ALL' ? rows : rows.filter(r => r.sto === activeSTO);
-    const displayRows = displayed.length ? displayed : rows;
+    const filtered    = activeSTO === 'ALL' ? rows : rows.filter(r => r.sto === activeSTO);
+    const displayRows = filtered.length ? filtered : rows;
 
-    const grouped = aggregate(displayRows);
-    const whitelistGrouped = aggregate(allRows);
-    buildSTOPills(whitelistGrouped);
-    setMeta(displayRows.length, grouped.length, globalStatus(displayRows));
+    buildSTOPills(aggregate(allRows));
+    setMeta(displayRows.length, aggregate(displayRows).length, globalStatus(displayRows));
     renderCards(displayRows);
 
   } catch(err) {
