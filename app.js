@@ -2,7 +2,7 @@
    DASHBOARD ALERT – JAKARTA TIMUR  v2
    Fitur: Status (Online/LOS/Dying Gasp/Offline)
           Filter STO, Dark/Light theme,
-          Panel ACTION STO & KENDALA (semua unik)
+          Panel ACTION STO & KENDALA (count per nilai)
    ============================================= */
 
 const CONFIG = {
@@ -13,8 +13,8 @@ const CONFIG = {
   COL_SN:     'SN',
   COL_CTYPE:  'CUSTOMER TYPE',
   COL_STATUS: 'STATUS',
-  COL_ACTION: 'ACTION STO',   // kolom O
-  COL_KENDALA:'KENDALA',      // kolom P
+  COL_ACTION: 'ACTION STO',
+  COL_KENDALA:'KENDALA',
 
   REFRESH_MS: 5 * 60 * 1000,
 
@@ -84,7 +84,7 @@ function buildSTOPills(grouped) {
   wrap.innerHTML = `<button class="sto-pill ${activeSTO==='ALL'?'active':''}" data-sto="ALL" onclick="filterSTO('ALL')">Semua</button>`;
   grouped.forEach(s => {
     const btn = document.createElement('button');
-    btn.className  = 'sto-pill' + (activeSTO === s.name ? ' active' : '');
+    btn.className   = 'sto-pill' + (activeSTO === s.name ? ' active' : '');
     btn.dataset.sto = s.name;
     btn.textContent = s.name;
     btn.onclick = () => filterSTO(s.name);
@@ -159,28 +159,22 @@ function aggregate(rows) {
   for (const r of rows) {
     const k = r.sto || '(Tanpa STO)';
     if (!map[k]) map[k] = {
-      total: 0,
-      ctypes: {},
+      total: 0, ctypes: {},
       statuses: { online:0, los:0, dying:0, offline:0, unknown:0 },
       rows: [],
-      actions: new Set(),   // semua unique ACTION STO
-      kendala: new Set(),   // semua unique KENDALA
+      actionCount: {},
+      kendalaCount: {},
     };
     map[k].total++;
     map[k].ctypes[r.ctype] = (map[k].ctypes[r.ctype] || 0) + 1;
     map[k].statuses[r.status]++;
     map[k].rows.push(r);
-    if (r.action)  map[k].actions.add(r.action);
-    if (r.kendala) map[k].kendala.add(r.kendala);
+    if (r.action)  map[k].actionCount[r.action]  = (map[k].actionCount[r.action]  || 0) + 1;
+    if (r.kendala) map[k].kendalaCount[r.kendala] = (map[k].kendalaCount[r.kendala] || 0) + 1;
   }
   return Object.entries(map)
     .sort((a,b) => b[1].total - a[1].total)
-    .map(([name, d]) => ({
-      name,
-      ...d,
-      actions: [...d.actions],
-      kendala: [...d.kendala],
-    }));
+    .map(([name, d]) => ({ name, ...d }));
 }
 
 function globalStatus(rows) {
@@ -240,7 +234,6 @@ function renderSTOCard(sto) {
 
   const isActive = activePanelSTO === sto.name;
 
-  // Simpan data actions & kendala di dataset sebagai JSON
   return `
     <div class="sto-card${isActive?' card-active':''}"
          data-sto="${esc(sto.name)}"
@@ -297,41 +290,52 @@ function toggleSidePanel(stoName, event) {
 
   activePanelSTO = stoName;
 
-  // Highlight card aktif
   document.querySelectorAll('.sto-card').forEach(c => c.classList.remove('card-active'));
   const card = document.querySelector(`.sto-card[data-sto="${CSS.escape(stoName)}"]`);
   if (card) card.classList.add('card-active');
 
-  // Kumpulkan unique actions & kendala dari allRows untuk STO ini
-  const stoRows  = allRows.filter(r => r.sto === stoName);
-  const actions  = [...new Set(stoRows.map(r => r.action).filter(Boolean))];
-  const kendala  = [...new Set(stoRows.map(r => r.kendala).filter(Boolean))];
+  // Hitung count per nilai dari allRows
+  const stoRows     = allRows.filter(r => r.sto === stoName);
+  const actionCount = {};
+  const kendalaCount = {};
+  stoRows.forEach(r => {
+    if (r.action)  actionCount[r.action]   = (actionCount[r.action]  || 0) + 1;
+    if (r.kendala) kendalaCount[r.kendala] = (kendalaCount[r.kendala] || 0) + 1;
+  });
 
-  // Render panel header
   document.getElementById('panel-sto-name').textContent = stoName;
 
-  // Render ACTION STO — tiap item sebagai badge
+  // Render ACTION STO — list dengan count, urut terbanyak
   const actionEl = document.getElementById('panel-action');
-  if (actions.length) {
-    actionEl.innerHTML = actions.map(a =>
-      `<span class="panel-badge panel-badge-action">${esc(a)}</span>`
-    ).join('');
+  const actionEntries = Object.entries(actionCount).sort((a,b) => b[1]-a[1]);
+  const actionTotal = actionEntries.reduce((s,[,c]) => s+c, 0);
+  document.getElementById('panel-action-total').textContent = actionTotal;
+  if (actionEntries.length) {
+    actionEl.innerHTML = actionEntries.map(([name, cnt]) => `
+      <div class="panel-row">
+        <span class="panel-row-name">${esc(name)}</span>
+        <span class="panel-row-count panel-count-action">${cnt}</span>
+      </div>`).join('');
   } else {
     actionEl.innerHTML = '<span class="panel-empty">Tidak ada data</span>';
   }
 
-  // Render KENDALA — tiap item sebagai badge
+  // Render KENDALA — list dengan count, urut terbanyak
   const kendalaEl = document.getElementById('panel-kendala');
-  if (kendala.length) {
-    kendalaEl.innerHTML = kendala.map(k =>
-      `<span class="panel-badge panel-badge-kendala">${esc(k)}</span>`
-    ).join('');
+  const kendalaEntries = Object.entries(kendalaCount).sort((a,b) => b[1]-a[1]);
+  const kendalaTotal = kendalaEntries.reduce((s,[,c]) => s+c, 0);
+  document.getElementById('panel-kendala-total').textContent = kendalaTotal;
+  if (kendalaEntries.length) {
+    kendalaEl.innerHTML = kendalaEntries.map(([name, cnt]) => `
+      <div class="panel-row">
+        <span class="panel-row-name">${esc(name)}</span>
+        <span class="panel-row-count panel-count-kendala">${cnt}</span>
+      </div>`).join('');
   } else {
     kendalaEl.innerHTML = '<span class="panel-empty">Tidak ada data</span>';
   }
 
-  const panel = document.getElementById('side-panel');
-  panel.classList.remove('hidden');
+  document.getElementById('side-panel').classList.remove('hidden');
 }
 
 function closeSidePanel() {
