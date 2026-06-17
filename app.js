@@ -1,7 +1,8 @@
 /* =============================================
    DASHBOARD ALERT – JAKARTA TIMUR  v2
    Fitur: Status (Online/LOS/Dying Gasp/Offline)
-          Filter STO, Dark/Light theme
+          Filter STO, Dark/Light theme,
+          Panel ACTION STO & KENDALA
    ============================================= */
 
 const CONFIG = {
@@ -11,9 +12,14 @@ const CONFIG = {
   COL_STO:    'STO',
   COL_SN:     'SN',
   COL_CTYPE:  'CUSTOMER TYPE',
-  COL_STATUS: 'STATUS',          // ← kolom status di sheet
+  COL_STATUS: 'STATUS',
+  COL_ACTION: 'ACTION STO',   // kolom O
+  COL_KENDALA:'KENDALA',      // kolom P
 
   REFRESH_MS: 5 * 60 * 1000,
+
+  // Whitelist STO — hanya nama ini yang ditampilkan di pills & cards
+  STO_WHITELIST: ['GAN','KRG','PGG','CWA','KLD','JTN','RMG','PDK','PGB','PSR'],
 };
 
 /* ── Status mapping ─────────────────────────── */
@@ -36,9 +42,10 @@ function normalizeStatus(raw) {
 }
 
 /* ── State ──────────────────────────────────── */
-let allRows    = [];
-let modalRows  = [];
-let activeSTO  = 'ALL';
+let allRows       = [];   // hanya baris STO whitelist
+let modalRows     = [];
+let activeSTO     = 'ALL';
+let activePanelSTO = null; // nama STO yang panel-nya sedang terbuka
 
 /* ── Theme ──────────────────────────────────── */
 function toggleTheme() {
@@ -51,7 +58,6 @@ function toggleTheme() {
 (function initTheme() {
   const saved = localStorage.getItem('theme') || 'dark';
   document.documentElement.setAttribute('data-theme', saved);
-  // btn tidak ada saat ini (belum DOM ready) — set setelah DOM load
   document.addEventListener('DOMContentLoaded', () => {
     document.querySelector('.theme-btn').textContent = saved === 'dark' ? '🌙' : '☀️';
   });
@@ -60,11 +66,21 @@ function toggleTheme() {
 /* ── Filter STO ─────────────────────────────── */
 function filterSTO(sto) {
   activeSTO = sto;
+  activePanelSTO = null;
+  closeSidePanel();
+
   document.querySelectorAll('.sto-pill').forEach(b => {
     b.classList.toggle('active', b.dataset.sto === sto);
   });
+
   const filtered = sto === 'ALL' ? allRows : allRows.filter(r => r.sto === sto);
-  renderCards(filtered);
+  const displayRows = filtered.length ? filtered : allRows;
+
+  // Update summary sesuai filter
+  const s = globalStatus(displayRows);
+  const grouped = aggregate(displayRows);
+  setMeta(displayRows.length, grouped.length, s);
+  renderCards(displayRows);
 }
 
 function buildSTOPills(grouped) {
@@ -96,25 +112,36 @@ function parseCSV(text) {
   if (lines.length < 2) return [];
   const headers = csvSplit(lines[0]).map(h => h.replace(/"/g,'').trim());
 
-  const iSTO    = findCol(headers, CONFIG.COL_STO);
-  const iSN     = findCol(headers, CONFIG.COL_SN);
-  const iCTYPE  = findCol(headers, CONFIG.COL_CTYPE);
-  const iSTATUS = findCol(headers, CONFIG.COL_STATUS);
+  const iSTO     = findCol(headers, CONFIG.COL_STO);
+  const iSN      = findCol(headers, CONFIG.COL_SN);
+  const iCTYPE   = findCol(headers, CONFIG.COL_CTYPE);
+  const iSTATUS  = findCol(headers, CONFIG.COL_STATUS);
+  const iACTION  = findCol(headers, CONFIG.COL_ACTION);
+  const iKENDALA = findCol(headers, CONFIG.COL_KENDALA);
 
   if (iSTO===-1 || iSN===-1 || iCTYPE===-1) {
     throw new Error(`Kolom tidak ditemukan. Header: ${headers.join(', ')}`);
   }
 
+  const whitelist = new Set(CONFIG.STO_WHITELIST.map(s => s.toUpperCase()));
   const rows = [];
+
   for (let i = 1; i < lines.length; i++) {
     const c = csvSplit(lines[i]).map(x => x.replace(/^"|"$/g,'').trim());
-    const sto = c[iSTO]||''; const sn = c[iSN]||'';
+    const sto = c[iSTO]||'';
+    const sn  = c[iSN]||'';
     if (!sto && !sn) continue;
+
+    // Filter: hanya STO yang ada di whitelist
+    if (!whitelist.has(sto.toUpperCase())) continue;
+
     rows.push({
       sto,
       sn,
-      ctype:  c[iCTYPE]  || 'Tidak diketahui',
-      status: normalizeStatus(iSTATUS !== -1 ? c[iSTATUS] : ''),
+      ctype:   c[iCTYPE]   || 'Tidak diketahui',
+      status:  normalizeStatus(iSTATUS  !== -1 ? c[iSTATUS]  : ''),
+      action:  iACTION  !== -1 ? (c[iACTION]  || '') : '',
+      kendala: iKENDALA !== -1 ? (c[iKENDALA] || '') : '',
     });
   }
   return rows;
@@ -137,11 +164,14 @@ function aggregate(rows) {
   const map = {};
   for (const r of rows) {
     const k = r.sto || '(Tanpa STO)';
-    if (!map[k]) map[k] = { total:0, ctypes:{}, statuses:{online:0,los:0,dying:0,offline:0,unknown:0}, rows:[] };
+    if (!map[k]) map[k] = { total:0, ctypes:{}, statuses:{online:0,los:0,dying:0,offline:0,unknown:0}, rows:[], action:'', kendala:'' };
     map[k].total++;
     map[k].ctypes[r.ctype] = (map[k].ctypes[r.ctype]||0)+1;
     map[k].statuses[r.status]++;
     map[k].rows.push(r);
+    // Ambil action & kendala dari baris pertama yang ada isinya
+    if (!map[k].action  && r.action)  map[k].action  = r.action;
+    if (!map[k].kendala && r.kendala) map[k].kendala = r.kendala;
   }
   return Object.entries(map)
     .sort((a,b)=>b[1].total-a[1].total)
@@ -157,7 +187,12 @@ function globalStatus(rows) {
 /* ── Render ─────────────────────────────────── */
 function render(rows) {
   const grouped = aggregate(rows);
-  buildSTOPills(aggregate(allRows));   // pills selalu dari semua data
+  // Pills dibangun dari whitelist yang ada di data, urut sesuai whitelist
+  const whitelistGrouped = aggregate(allRows).filter(g =>
+    CONFIG.STO_WHITELIST.includes(g.name.toUpperCase()) ||
+    CONFIG.STO_WHITELIST.includes(g.name)
+  );
+  buildSTOPills(whitelistGrouped);
   setMeta(rows.length, grouped.length, globalStatus(rows));
   renderCards(rows);
 }
@@ -170,10 +205,15 @@ function renderCards(rows) {
   }
   const grouped = aggregate(rows);
   grid.innerHTML = grouped.map(renderSTOCard).join('');
+
+  // Jika ada panel yang aktif, highlight card-nya
+  if (activePanelSTO) {
+    const card = document.querySelector(`.sto-card[data-sto="${CSS.escape(activePanelSTO)}"]`);
+    if (card) card.classList.add('card-active');
+  }
 }
 
 function renderSTOCard(sto) {
-  /* ── Status grid ── */
   const statOrder = ['online','los','dying','offline'];
   const statusHTML = statOrder.map(sk => {
     const cnt = sto.statuses[sk] || 0;
@@ -187,7 +227,6 @@ function renderSTOCard(sto) {
       </div>`;
   }).join('');
 
-  /* ── Customer type ── */
   const ctypes = Object.entries(sto.ctypes).sort((a,b)=>b[1]-a[1]);
   const ctypeHTML = ctypes.map(([name,count]) => {
     const pct = Math.round(count/sto.total*100);
@@ -201,12 +240,14 @@ function renderSTOCard(sto) {
       </div>`;
   }).join('');
 
+  const isActive = activePanelSTO === sto.name;
+
   return `
-    <div class="sto-card">
+    <div class="sto-card${isActive?' card-active':''}" data-sto="${esc(sto.name)}" onclick="toggleSidePanel('${esc(sto.name)}', '${esc(sto.action)}', '${esc(sto.kendala)}', event)">
       <div class="sto-name">${esc(sto.name)}</div>
       <div class="sto-total-row">
         <span class="sto-total-label">Total Alert</span>
-        <span class="sto-total-badge" onclick="openModal('${esc(sto.name)}',null,null)">${sto.total}</span>
+        <span class="sto-total-badge" onclick="openModal('${esc(sto.name)}',null,null);event.stopPropagation()">${sto.total}</span>
       </div>
 
       <div class="card-divider"></div>
@@ -216,6 +257,8 @@ function renderSTOCard(sto) {
       <div class="card-divider"></div>
       <div class="section-label">Customer Type</div>
       <div class="ctype-list">${ctypeHTML}</div>
+
+      <div class="card-hint">Klik card untuk lihat Action & Kendala →</div>
     </div>`;
 }
 
@@ -240,6 +283,42 @@ function esc(s) {
   return String(s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+/* ── Side Panel ACTION & KENDALA ────────────── */
+function toggleSidePanel(stoName, action, kendala, event) {
+  // Jangan buka panel jika klik pada elemen interaktif di dalam card
+  if (event && event.target.closest('.status-item, .ctype-count, .sto-total-badge')) return;
+
+  if (activePanelSTO === stoName) {
+    // Klik card yang sama → tutup panel
+    closeSidePanel();
+    return;
+  }
+
+  activePanelSTO = stoName;
+
+  // Highlight card aktif
+  document.querySelectorAll('.sto-card').forEach(c => c.classList.remove('card-active'));
+  const card = document.querySelector(`.sto-card[data-sto="${CSS.escape(stoName)}"]`);
+  if (card) card.classList.add('card-active');
+
+  // Isi & tampilkan panel
+  document.getElementById('panel-sto-name').textContent = stoName;
+  document.getElementById('panel-action').textContent   = action  || '–';
+  document.getElementById('panel-kendala').textContent  = kendala || '–';
+
+  const panel = document.getElementById('side-panel');
+  panel.classList.remove('hidden');
+  panel.classList.add('panel-open');
+}
+
+function closeSidePanel() {
+  activePanelSTO = null;
+  document.querySelectorAll('.sto-card').forEach(c => c.classList.remove('card-active'));
+  const panel = document.getElementById('side-panel');
+  panel.classList.add('hidden');
+  panel.classList.remove('panel-open');
 }
 
 /* ── Modal ──────────────────────────────────── */
@@ -298,22 +377,24 @@ function renderModalTable(rows) {
 }
 
 document.getElementById('modal-overlay').addEventListener('click', function(e){ if(e.target===this) closeModal(); });
-document.addEventListener('keydown', e => { if(e.key==='Escape') closeModal(); });
+document.addEventListener('keydown', e => { if(e.key==='Escape') { closeModal(); closeSidePanel(); } });
 
 /* ── Load cycle ─────────────────────────────── */
 async function loadAndRender() {
   try {
     const rows = await fetchData();
-    hideError(); allRows = rows;
-    const displayed = activeSTO==='ALL' ? rows : rows.filter(r=>r.sto===activeSTO);
-    render(displayed.length ? displayed : rows);   // fallback ke semua jika filter kosong
-    // Update summary selalu dari semua data
-    const s = globalStatus(rows);
-    document.getElementById('total-alert').textContent   = displayed.length;
-    document.getElementById('total-online').textContent  = globalStatus(displayed).online;
-    document.getElementById('total-los').textContent     = globalStatus(displayed).los;
-    document.getElementById('total-dying').textContent   = globalStatus(displayed).dying;
-    document.getElementById('total-offline').textContent = globalStatus(displayed).offline;
+    hideError();
+    allRows = rows;
+
+    const displayed = activeSTO === 'ALL' ? rows : rows.filter(r => r.sto === activeSTO);
+    const displayRows = displayed.length ? displayed : rows;
+
+    const grouped = aggregate(displayRows);
+    const whitelistGrouped = aggregate(allRows);
+    buildSTOPills(whitelistGrouped);
+    setMeta(displayRows.length, grouped.length, globalStatus(displayRows));
+    renderCards(displayRows);
+
   } catch(err) {
     console.error(err);
     showError(err.message + ' — Pastikan spreadsheet sudah publik.');

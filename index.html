@@ -26,7 +26,7 @@
     </div>
   </header>
 
-  <!-- TOOLBAR: FILTER STO + THEME -->
+  <!-- TOOLBAR: FILTER STO -->
   <div class="toolbar">
     <div class="toolbar-inner">
       <div class="toolbar-left">
@@ -69,13 +69,47 @@
   <!-- STATUS / ERROR MESSAGE -->
   <div id="status-msg" class="status-msg hidden"></div>
 
-  <!-- MAIN GRID — STO CARDS -->
-  <main id="sto-grid" class="sto-grid">
-    <div class="loading-state">
-      <div class="spinner"></div>
-      <p>Memuat data dari spreadsheet…</p>
-    </div>
-  </main>
+  <!-- CONTENT AREA: GRID + SIDE PANEL -->
+  <div class="content-area">
+
+    <!-- MAIN GRID — STO CARDS -->
+    <main id="sto-grid" class="sto-grid">
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <p>Memuat data dari spreadsheet…</p>
+      </div>
+    </main>
+
+    <!-- SIDE PANEL — ACTION STO & KENDALA -->
+    <aside id="side-panel" class="side-panel hidden">
+      <div class="panel-header">
+        <div class="panel-title-row">
+          <span class="panel-dot"></span>
+          <h3 id="panel-sto-name">–</h3>
+        </div>
+        <button class="panel-close" onclick="closeSidePanel()" title="Tutup">✕</button>
+      </div>
+
+      <div class="panel-body">
+        <div class="panel-section">
+          <div class="panel-section-label">
+            <span class="panel-icon">⚡</span> Action STO
+          </div>
+          <div id="panel-action" class="panel-content">–</div>
+        </div>
+
+        <div class="panel-divider"></div>
+
+        <div class="panel-section">
+          <div class="panel-section-label">
+            <span class="panel-icon">⚠️</span> Kendala
+          </div>
+          <div id="panel-kendala" class="panel-content">–</div>
+        </div>
+      </div>
+    </aside>
+
+  </div><!-- /content-area -->
 
   <!-- MODAL DETAIL -->
   <div id="modal-overlay" class="modal-overlay hidden">
