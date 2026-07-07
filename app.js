@@ -199,10 +199,12 @@ function render(rows) {
 function renderCards(rows) {
   const grid = document.getElementById('sto-grid');
   if (!rows.length) {
+    grid.classList.remove('single-card');
     grid.innerHTML = '<div class="empty-state">Tidak ada data untuk filter ini.</div>';
     return;
   }
   const grouped = aggregate(rows);
+  grid.classList.toggle('single-card', grouped.length === 1);
   grid.innerHTML = grouped.map(renderSTOCard).join('');
 
   if (activePanelSTO) {
