@@ -65,8 +65,6 @@ function toggleTheme() {
 /* ── Filter STO ─────────────────────────────── */
 function filterSTO(sto) {
   activeSTO = sto;
-  activePanelSTO = null;
-  closeSidePanel();
 
   document.querySelectorAll('.sto-pill').forEach(b => {
     b.classList.toggle('active', b.dataset.sto === sto);
@@ -77,6 +75,14 @@ function filterSTO(sto) {
   const grouped     = aggregate(displayRows);
   setMeta(displayRows.length, grouped.length, globalStatus(displayRows));
   renderCards(displayRows);
+
+  // Kalau filter spesifik (bukan "Semua"), langsung tampilkan panel
+  // Action STO & Kendala untuk STO tersebut tanpa perlu klik card.
+  if (sto !== 'ALL') {
+    openSidePanel(sto);
+  } else {
+    closeSidePanel();
+  }
 }
 
 function buildSTOPills(grouped) {
@@ -288,6 +294,10 @@ function toggleSidePanel(stoName, event) {
     return;
   }
 
+  openSidePanel(stoName);
+}
+
+function openSidePanel(stoName) {
   activePanelSTO = stoName;
 
   document.querySelectorAll('.sto-card').forEach(c => c.classList.remove('card-active'));
@@ -415,6 +425,9 @@ async function loadAndRender() {
     buildSTOPills(aggregate(allRows));
     setMeta(displayRows.length, aggregate(displayRows).length, globalStatus(displayRows));
     renderCards(displayRows);
+
+    // Refresh panel Action & Kendala kalau sedang terbuka
+    if (activePanelSTO) openSidePanel(activePanelSTO);
 
   } catch(err) {
     console.error(err);
