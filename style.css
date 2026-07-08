@@ -186,6 +186,7 @@ header {
   border-radius: 50%; animation: spin 0.8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 /* ── STO CARD ───────────────────────────────── */
 .sto-card {
@@ -348,10 +349,10 @@ header {
   color: var(--c-offline);
 }
 
-/* Donut chart + list bersebelahan (horizontal) */
+/* Donut chart + list bersebelahan (horizontal), chart selalu center vertikal */
 .panel-section-body {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
 }
 .panel-content { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
@@ -398,6 +399,12 @@ header {
   width: 84px; height: 84px;
   border-radius: 50%;
   flex-shrink: 0;
+  cursor: pointer;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+.donut-chart:hover {
+  transform: scale(1.06);
+  filter: brightness(1.08);
 }
 .donut-chart::before {
   content: '';
@@ -419,6 +426,73 @@ header {
 }
 
 .panel-divider { height: 1px; background: var(--border); margin: 6px 0 14px; }
+
+/* ── Chart Zoom Modal ────────────────────────── */
+.chart-zoom-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 200;
+  padding: 20px;
+  animation: fadeIn 0.15s ease;
+}
+.chart-zoom-overlay.hidden { display: none; }
+.chart-zoom-box {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 22px 24px 26px;
+  width: 340px;
+  max-width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  animation: slideIn 0.18s ease;
+}
+.chart-zoom-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 18px;
+}
+.chart-zoom-title {
+  font-size: 15px; font-weight: 700; color: var(--text);
+  display: flex; align-items: center; gap: 8px;
+}
+.chart-zoom-close {
+  background: var(--bg3); border: 1px solid var(--border);
+  color: var(--text2); width: 28px; height: 28px; border-radius: 50%;
+  cursor: pointer; font-size: 14px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+}
+.chart-zoom-close:hover { background: var(--bg4, var(--bg3)); color: var(--text); }
+.chart-zoom-donut-wrap { display: flex; justify-content: center; margin-bottom: 20px; }
+.chart-zoom-donut {
+  position: relative;
+  width: 220px; height: 220px;
+  border-radius: 50%;
+}
+.chart-zoom-donut::before {
+  content: '';
+  position: absolute; inset: 34px;
+  background: var(--bg2);
+  border-radius: 50%;
+}
+.chart-zoom-center {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+}
+.chart-zoom-center-value { font-family: var(--mono); font-size: 34px; font-weight: 700; color: var(--text); }
+.chart-zoom-center-label { font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text3); margin-top: 3px; }
+.chart-zoom-legend { display: flex; flex-direction: column; gap: 6px; }
+.chart-zoom-legend-row {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 7px; padding: 8px 10px;
+}
+.chart-zoom-legend-name { display: flex; align-items: center; font-size: 12.5px; font-weight: 500; color: var(--text); }
+.chart-zoom-legend-pct { font-family: var(--mono); font-size: 11px; color: var(--text3); margin-left: 6px; }
+.chart-zoom-legend-count { font-family: var(--mono); font-size: 13px; font-weight: 700; padding: 1px 8px; border-radius: 5px; }
+
 
 
 
