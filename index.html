@@ -149,6 +149,20 @@
     </div>
   </div>
 
+  <!-- CHART ZOOM MODAL -->
+  <div id="chart-zoom-overlay" class="chart-zoom-overlay hidden" onclick="if(event.target===this) closeChartZoom()">
+    <div class="chart-zoom-box">
+      <div class="chart-zoom-header">
+        <span class="chart-zoom-title" id="chart-zoom-title">–</span>
+        <button class="chart-zoom-close" onclick="closeChartZoom()" title="Tutup">✕</button>
+      </div>
+      <div class="chart-zoom-donut-wrap">
+        <div id="chart-zoom-donut" class="chart-zoom-donut"></div>
+      </div>
+      <div id="chart-zoom-legend" class="chart-zoom-legend"></div>
+    </div>
+  </div>
+
   <script src="app.js"></script>
 </body>
 </html>
