@@ -40,6 +40,42 @@ function normalizeStatus(raw) {
   return STATUS_KEY[k] || 'unknown';
 }
 
+/* Palet warna donut chart (dipakai bergiliran per item) ──── */
+const DONUT_COLORS = [
+  '#f97316', '#3b82f6', '#a855f7', '#10b981',
+  '#eab308', '#ec4899', '#14b8a6', '#f43f5e',
+  '#6366f1', '#84cc16',
+];
+/* Palet terpisah utk Kendala biar visualnya beda dari Action STO */
+const DONUT_COLORS_KENDALA = [
+  '#ef4444', '#f97316', '#eab308', '#ec4899',
+  '#a855f7', '#f43f5e', '#fb923c', '#e11d48',
+  '#c026d3', '#facc15',
+];
+
+/* Render donut chart conic-gradient dari daftar [nama, jumlah] */
+function renderDonut(containerId, entries, total, colors = DONUT_COLORS) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  if (!entries.length || !total) { el.innerHTML = ''; return; }
+
+  let cumulative = 0;
+  const stops = entries.map(([, cnt], i) => {
+    const color = colors[i % colors.length];
+    const start = cumulative;
+    cumulative += (cnt / total) * 100;
+    return `${color} ${start}% ${cumulative}%`;
+  }).join(', ');
+
+  el.innerHTML = `
+    <div class="donut-chart" style="background: conic-gradient(${stops});">
+      <div class="donut-center">
+        <span class="donut-center-value">${total}</span>
+        <span class="donut-center-label">Total</span>
+      </div>
+    </div>`;
+}
+
 /* ── State ──────────────────────────────────── */
 let allRows        = [];
 let modalRows      = [];
@@ -317,30 +353,32 @@ function openSidePanel(stoName) {
 
   document.getElementById('panel-sto-name').textContent = stoName;
 
-  // Render ACTION STO — list dengan count, urut terbanyak
+  // Render ACTION STO — donut chart + list dengan count, urut terbanyak
   const actionEl = document.getElementById('panel-action');
   const actionEntries = Object.entries(actionCount).sort((a,b) => b[1]-a[1]);
   const actionTotal = actionEntries.reduce((s,[,c]) => s+c, 0);
   document.getElementById('panel-action-total').textContent = actionTotal;
+  renderDonut('panel-action-chart', actionEntries, actionTotal);
   if (actionEntries.length) {
-    actionEl.innerHTML = actionEntries.map(([name, cnt]) => `
+    actionEl.innerHTML = actionEntries.map(([name, cnt], i) => `
       <div class="panel-row">
-        <span class="panel-row-name">${esc(name)}</span>
+        <span class="panel-row-name"><span class="legend-dot" style="background:${DONUT_COLORS[i % DONUT_COLORS.length]}"></span>${esc(name)}</span>
         <span class="panel-row-count panel-count-action">${cnt}</span>
       </div>`).join('');
   } else {
     actionEl.innerHTML = '<span class="panel-empty">Tidak ada data</span>';
   }
 
-  // Render KENDALA — list dengan count, urut terbanyak
+  // Render KENDALA — donut chart + list dengan count, urut terbanyak
   const kendalaEl = document.getElementById('panel-kendala');
   const kendalaEntries = Object.entries(kendalaCount).sort((a,b) => b[1]-a[1]);
   const kendalaTotal = kendalaEntries.reduce((s,[,c]) => s+c, 0);
   document.getElementById('panel-kendala-total').textContent = kendalaTotal;
+  renderDonut('panel-kendala-chart', kendalaEntries, kendalaTotal, DONUT_COLORS_KENDALA);
   if (kendalaEntries.length) {
-    kendalaEl.innerHTML = kendalaEntries.map(([name, cnt]) => `
+    kendalaEl.innerHTML = kendalaEntries.map(([name, cnt], i) => `
       <div class="panel-row">
-        <span class="panel-row-name">${esc(name)}</span>
+        <span class="panel-row-name"><span class="legend-dot" style="background:${DONUT_COLORS_KENDALA[i % DONUT_COLORS_KENDALA.length]}"></span>${esc(name)}</span>
         <span class="panel-row-count panel-count-kendala">${cnt}</span>
       </div>`).join('');
   } else {
