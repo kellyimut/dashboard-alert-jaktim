@@ -53,11 +53,16 @@ const DONUT_COLORS_KENDALA = [
   '#c026d3', '#facc15',
 ];
 
+/* Simpan data donut per container, dipakai saat zoom diklik */
+let donutDataStore = {};
+
 /* Render donut chart conic-gradient dari daftar [nama, jumlah] */
-function renderDonut(containerId, entries, total, colors = DONUT_COLORS) {
+function renderDonut(containerId, entries, total, colors = DONUT_COLORS, title = '') {
   const el = document.getElementById(containerId);
   if (!el) return;
-  if (!entries.length || !total) { el.innerHTML = ''; return; }
+  if (!entries.length || !total) { el.innerHTML = ''; donutDataStore[containerId] = null; return; }
+
+  donutDataStore[containerId] = { entries, total, colors, title };
 
   let cumulative = 0;
   const stops = entries.map(([, cnt], i) => {
@@ -68,12 +73,56 @@ function renderDonut(containerId, entries, total, colors = DONUT_COLORS) {
   }).join(', ');
 
   el.innerHTML = `
-    <div class="donut-chart" style="background: conic-gradient(${stops});">
+    <div class="donut-chart" style="background: conic-gradient(${stops});" onclick="openChartZoom('${containerId}')" title="Klik untuk perbesar">
       <div class="donut-center">
         <span class="donut-center-value">${total}</span>
         <span class="donut-center-label">Total</span>
       </div>
     </div>`;
+}
+
+/* Buka modal zoom donut chart (versi besar + legend lengkap %) */
+function openChartZoom(containerId) {
+  const data = donutDataStore[containerId];
+  if (!data) return;
+  const { entries, total, colors, title } = data;
+
+  document.getElementById('chart-zoom-title').textContent = title;
+
+  let cumulative = 0;
+  const stops = entries.map(([, cnt], i) => {
+    const color = colors[i % colors.length];
+    const start = cumulative;
+    cumulative += (cnt / total) * 100;
+    return `${color} ${start}% ${cumulative}%`;
+  }).join(', ');
+
+  const donutEl = document.getElementById('chart-zoom-donut');
+  donutEl.style.background = `conic-gradient(${stops})`;
+  donutEl.innerHTML = `
+    <div class="chart-zoom-center">
+      <span class="chart-zoom-center-value">${total}</span>
+      <span class="chart-zoom-center-label">Total</span>
+    </div>`;
+
+  document.getElementById('chart-zoom-legend').innerHTML = entries.map(([name, cnt], i) => {
+    const pct   = total ? ((cnt / total) * 100).toFixed(1) : '0.0';
+    const color = colors[i % colors.length];
+    return `
+      <div class="chart-zoom-legend-row">
+        <span class="chart-zoom-legend-name">
+          <span class="legend-dot" style="background:${color}"></span>${esc(name)}
+          <span class="chart-zoom-legend-pct">(${pct}%)</span>
+        </span>
+        <span class="chart-zoom-legend-count" style="background:${color}22; border:1px solid ${color}66; color:${color};">${cnt}</span>
+      </div>`;
+  }).join('');
+
+  document.getElementById('chart-zoom-overlay').classList.remove('hidden');
+}
+
+function closeChartZoom() {
+  document.getElementById('chart-zoom-overlay').classList.add('hidden');
 }
 
 /* ── State ──────────────────────────────────── */
@@ -358,7 +407,7 @@ function openSidePanel(stoName) {
   const actionEntries = Object.entries(actionCount).sort((a,b) => b[1]-a[1]);
   const actionTotal = actionEntries.reduce((s,[,c]) => s+c, 0);
   document.getElementById('panel-action-total').textContent = actionTotal;
-  renderDonut('panel-action-chart', actionEntries, actionTotal);
+  renderDonut('panel-action-chart', actionEntries, actionTotal, DONUT_COLORS, `${stoName} — Action STO`);
   if (actionEntries.length) {
     actionEl.innerHTML = actionEntries.map(([name, cnt], i) => `
       <div class="panel-row">
@@ -374,7 +423,7 @@ function openSidePanel(stoName) {
   const kendalaEntries = Object.entries(kendalaCount).sort((a,b) => b[1]-a[1]);
   const kendalaTotal = kendalaEntries.reduce((s,[,c]) => s+c, 0);
   document.getElementById('panel-kendala-total').textContent = kendalaTotal;
-  renderDonut('panel-kendala-chart', kendalaEntries, kendalaTotal, DONUT_COLORS_KENDALA);
+  renderDonut('panel-kendala-chart', kendalaEntries, kendalaTotal, DONUT_COLORS_KENDALA, `${stoName} — Kendala`);
   if (kendalaEntries.length) {
     kendalaEl.innerHTML = kendalaEntries.map(([name, cnt], i) => `
       <div class="panel-row">
